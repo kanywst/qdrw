@@ -2,7 +2,7 @@
   "name": "qdrw",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://username.github.io/qdrw",
+  "homepage": "https://kanywst.github.io/qdrw",
   "type": "module",
   "scripts": {
     "dev": "vite",

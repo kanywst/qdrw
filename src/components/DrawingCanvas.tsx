@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { getStroke } from 'perfect-freehand';
 import type { Stroke, Point, ActiveTool, StrokeWidth, ColorScheme } from '../types';
-import { STROKE_WIDTH_PX, COLOR_SCHEME_CONFIG } from '../types';
+import { STROKE_WIDTH_PX } from '../types';
 
 interface DrawingCanvasProps {
   strokes: Stroke[];
@@ -35,6 +35,17 @@ function getSvgPathFromStroke(points: number[][]): string {
   return d.join(' ');
 }
 
+// Stroke colors — brighter/more visible for both modes
+const STROKE_COLOR: Record<ColorScheme, string> = {
+  dark: '#ffffff',   // pure white on dark bg
+  light: '#111111',  // near-black on light bg
+};
+
+const BACKGROUND_COLOR: Record<ColorScheme, string> = {
+  dark: '#141414',
+  light: '#fafafa',
+};
+
 function drawStroke(
   ctx: CanvasRenderingContext2D,
   stroke: Stroke | { points: Point[]; tool: ActiveTool; width: StrokeWidth; color: string },
@@ -46,10 +57,10 @@ function drawStroke(
     stroke.points.map((p) => [p.x, p.y, p.pressure]),
     {
       size: STROKE_WIDTH_PX[stroke.width],
-      thinning: 0.5,
+      thinning: 0.2,
       smoothing: 0.5,
-      streamline: 0.5,
-      simulatePressure: true,
+      streamline: 0.4,
+      simulatePressure: false,
     }
   );
 
@@ -65,7 +76,7 @@ function drawStroke(
     ctx.fillStyle = 'rgba(0,0,0,1)';
   } else {
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = COLOR_SCHEME_CONFIG[colorScheme].stroke;
+    ctx.fillStyle = STROKE_COLOR[colorScheme];
   }
 
   ctx.fill(path);
@@ -137,7 +148,7 @@ export function DrawingCanvas({
     rafId = requestAnimationFrame(() => {
       // Clear with background color
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = COLOR_SCHEME_CONFIG[colorScheme].background;
+      ctx.fillStyle = BACKGROUND_COLOR[colorScheme];
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Draw all committed strokes
@@ -149,7 +160,7 @@ export function DrawingCanvas({
       if (currentStroke.length > 0) {
         drawStroke(
           ctx,
-          { points: currentStroke, tool: activeTool, width: strokeWidth, color: COLOR_SCHEME_CONFIG[colorScheme].stroke },
+          { points: currentStroke, tool: activeTool, width: strokeWidth, color: STROKE_COLOR[colorScheme] },
           colorScheme
         );
       }

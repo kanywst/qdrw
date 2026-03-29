@@ -4,7 +4,7 @@ open → draw → paste into AI. that's it.
 
 a zero-friction whiteboard for dropping visual context into LLM chats — wireframes, diagrams, quick sketches. no backend, no account, no friction.
 
-→ **[qdrw.github.io/qdrw](https://username.github.io/qdrw)**
+→ **[kanywst.github.io/qdrw](https://kanywst.github.io/qdrw)**
 
 ---
 

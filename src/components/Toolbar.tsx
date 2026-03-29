@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Eraser, Copy, Trash2 } from 'lucide-react';
+import { Pencil, Eraser, Copy, Trash2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { ActiveTool, StrokeWidth, ColorScheme } from '../types';
 
@@ -11,6 +11,7 @@ interface ToolbarProps {
   onToolChange: (tool: ActiveTool) => void;
   onWidthChange: (width: StrokeWidth) => void;
   onCopy: () => void;
+  onDownload: () => void;
   onClear: () => void;
 }
 
@@ -93,6 +94,7 @@ export function Toolbar({
   onToolChange,
   onWidthChange,
   onCopy,
+  onDownload,
   onClear,
 }: ToolbarProps) {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -202,6 +204,16 @@ export function Toolbar({
           <Copy size={16} />
         </button>
 
+        {/* Download button */}
+        <button
+          style={baseButtonStyle}
+          onClick={onDownload}
+          title="Download PNG (S)"
+          aria-label="Download as PNG"
+        >
+          <Download size={16} />
+        </button>
+
         {/* Clear button */}
         <button
           style={baseButtonStyle}
@@ -244,8 +256,8 @@ export function Toolbar({
               >
                 <div>B&nbsp;&nbsp;brush&nbsp;&nbsp;&nbsp;&nbsp;E&nbsp;&nbsp;eraser</div>
                 <div>Z&nbsp;&nbsp;undo&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;C&nbsp;&nbsp;copy</div>
-                <div>[&nbsp;&nbsp;thinner&nbsp;&nbsp;]&nbsp;&nbsp;thicker</div>
-                <div>⇧C&nbsp;clear</div>
+                <div>S&nbsp;&nbsp;save&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;&nbsp;thinner</div>
+                <div>]&nbsp;&nbsp;thicker&nbsp;&nbsp;⇧C&nbsp;clear</div>
               </motion.div>
             )}
           </AnimatePresence>

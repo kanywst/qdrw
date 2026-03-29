@@ -1,5 +1,5 @@
 import type React from 'react';
-import { COLOR_SCHEME_CONFIG, EXPORT_PADDING } from '../types';
+import { EXPORT_PADDING } from '../types';
 import type { ColorScheme } from '../types';
 
 /**
@@ -67,33 +67,59 @@ export function triggerDownload(blob: Blob, filename: string): void {
  * Supports the two known oklch values used in the app.
  */
 function parseBgColor(colorScheme: ColorScheme): { r: number; g: number; b: number } {
-  const bg = COLOR_SCHEME_CONFIG[colorScheme].background;
-  // 'oklch(10% 0 0)' → dark mode ≈ rgb(20, 20, 20)
-  // 'oklch(98% 0 0)' → light mode ≈ rgb(250, 250, 250)
-  if (bg.includes('10%')) {
-    return { r: 20, g: 20, b: 20 };
-  }
-  return { r: 250, g: 250, b: 250 };
+  // Must match BACKGROUND_COLOR in DrawingCanvas.tsx
+  return colorScheme === 'dark'
+    ? { r: 20, g: 20, b: 20 }    // #141414
+    : { r: 250, g: 250, b: 250 }; // #fafafa
 }
 
 /**
  * AutoCrop: reads the canvas, computes the bounding box of drawn pixels,
  * crops with EXPORT_PADDING, and writes the result to the Clipboard as PNG.
- * Falls back to a file download if the Clipboard API is unavailable.
+ * Throws if clipboard write fails (caller should handle fallback/toast).
  */
 export async function autoCrop(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   colorScheme: ColorScheme
 ): Promise<void> {
+  const blob = await getExportBlob(canvasRef, colorScheme);
+  if (!blob) return;
+
+  // ClipboardItem requires Blob directly (not Promise<Blob>)
+  await navigator.clipboard.write([
+    new ClipboardItem({ 'image/png': blob }),
+  ]);
+}
+
+/**
+ * Download the canvas as a PNG file.
+ */
+export async function downloadPng(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  colorScheme: ColorScheme
+): Promise<void> {
+  const blob = await getExportBlob(canvasRef, colorScheme);
+  if (!blob) return;
+  triggerDownload(blob, 'qdrw-export.png');
+}
+
+/**
+ * Shared logic: crop the canvas and return a PNG Blob.
+ */
+async function getExportBlob(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  colorScheme: ColorScheme
+): Promise<Blob | null> {
   const canvas = canvasRef.current;
-  if (!canvas) return;
+  if (!canvas) return null;
 
   const { width, height } = canvas;
+  if (width === 0 || height === 0) return null;
 
   // Draw canvas onto an OffscreenCanvas to read pixel data
   const offscreen = new OffscreenCanvas(width, height);
   const ctx = offscreen.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) return null;
 
   ctx.drawImage(canvas, 0, 0);
   const imageData = ctx.getImageData(0, 0, width, height);
@@ -101,36 +127,23 @@ export async function autoCrop(
   const bgColor = parseBgColor(colorScheme);
   const bbox = computeBoundingBox(imageData, bgColor);
 
-  let blob: Blob;
-
   if (bbox === null) {
     // Empty canvas — export full canvas
-    blob = await offscreen.convertToBlob({ type: 'image/png' });
-  } else {
-    // Crop with padding, clamped to canvas bounds
-    const cropX = Math.max(0, bbox.minX - EXPORT_PADDING);
-    const cropY = Math.max(0, bbox.minY - EXPORT_PADDING);
-    const cropRight = Math.min(width, bbox.maxX + EXPORT_PADDING + 1);
-    const cropBottom = Math.min(height, bbox.maxY + EXPORT_PADDING + 1);
-    const cropW = cropRight - cropX;
-    const cropH = cropBottom - cropY;
-
-    const croppedCanvas = new OffscreenCanvas(cropW, cropH);
-    const croppedCtx = croppedCanvas.getContext('2d');
-    if (!croppedCtx) return;
-
-    croppedCtx.drawImage(offscreen, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-    blob = await croppedCanvas.convertToBlob({ type: 'image/png' });
+    return offscreen.convertToBlob({ type: 'image/png' });
   }
 
-  // Try Clipboard API first
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': blob }),
-    ]);
-  } catch (err) {
-    // Clipboard API unavailable or permission denied — fall back to download
-    console.warn('Clipboard API unavailable, falling back to file download:', err);
-    triggerDownload(blob, 'qdrw-export.png');
-  }
+  // Crop with padding, clamped to canvas bounds
+  const cropX = Math.max(0, bbox.minX - EXPORT_PADDING);
+  const cropY = Math.max(0, bbox.minY - EXPORT_PADDING);
+  const cropRight = Math.min(width, bbox.maxX + EXPORT_PADDING + 1);
+  const cropBottom = Math.min(height, bbox.maxY + EXPORT_PADDING + 1);
+  const cropW = cropRight - cropX;
+  const cropH = cropBottom - cropY;
+
+  const croppedCanvas = new OffscreenCanvas(cropW, cropH);
+  const croppedCtx = croppedCanvas.getContext('2d');
+  if (!croppedCtx) return null;
+
+  croppedCtx.drawImage(offscreen, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+  return croppedCanvas.convertToBlob({ type: 'image/png' });
 }

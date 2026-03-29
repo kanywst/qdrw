@@ -4,12 +4,16 @@ import { useDrawing } from './hooks/useDrawing';
 import { DrawingCanvas } from './components/DrawingCanvas';
 import { Toolbar } from './components/Toolbar';
 import { Toast } from './components/Toast';
+import { Splash } from './components/Splash';
 import { COLOR_SCHEME_CONFIG } from './types';
+import { downloadPng } from './utils/autoCrop';
+import { AnimatePresence } from 'motion/react';
 
 function App(): React.ReactElement {
   const { colorScheme } = useColorScheme();
   const { strokes, currentStroke, activeTool, strokeWidth, isDrawing, dispatch, handleCopy, handleClear } = useDrawing();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [showSplash, setShowSplash] = useState(true);
 
   // Apply CSS custom properties when colorScheme changes
   useEffect(() => {
@@ -45,11 +49,23 @@ function App(): React.ReactElement {
   }, [handleClear, showToast]);
 
   const handleCopyWithToast = useCallback(async () => {
-    await handleCopy(canvasRef, colorScheme);
-    showToast('COPIED ✓');
+    try {
+      await handleCopy(canvasRef, colorScheme);
+      showToast('COPIED ✓');
+    } catch {
+      // Clipboard API failed — fall back to download
+      await downloadPng(canvasRef, colorScheme);
+      showToast('SAVED ↓');
+    }
   }, [handleCopy, canvasRef, colorScheme, showToast]);
 
+  const handleDownloadWithToast = useCallback(async () => {
+    await downloadPng(canvasRef, colorScheme);
+    showToast('SAVED ↓');
+  }, [canvasRef, colorScheme, showToast]);
+
   useEffect(() => {
+    if (showSplash) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -73,6 +89,13 @@ function App(): React.ReactElement {
           if (!e.shiftKey) {
             dispatch({ type: 'UNDO' });
             showToast('UNDO');
+          }
+          break;
+        case 's':
+        case 'S':
+          if (!isCtrlOrCmd) {
+            e.preventDefault();
+            handleDownloadWithToast();
           }
           break;
         case '[':
@@ -99,10 +122,18 @@ function App(): React.ReactElement {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, strokeWidth, handleClearWithConfirm, handleCopyWithToast, showToast]);
+  }, [dispatch, strokeWidth, handleClearWithConfirm, handleCopyWithToast, handleDownloadWithToast, showToast, showSplash]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: COLOR_SCHEME_CONFIG[colorScheme].background }}>
+      <AnimatePresence>
+        {showSplash && (
+          <Splash
+            colorScheme={colorScheme}
+            onEnter={() => setShowSplash(false)}
+          />
+        )}
+      </AnimatePresence>
       <DrawingCanvas
         strokes={strokes}
         currentStroke={currentStroke}
@@ -122,6 +153,7 @@ function App(): React.ReactElement {
         onToolChange={(tool) => dispatch({ type: 'SET_TOOL', tool })}
         onWidthChange={(width) => dispatch({ type: 'SET_WIDTH', width })}
         onCopy={handleCopyWithToast}
+        onDownload={handleDownloadWithToast}
         onClear={handleClearWithConfirm}
       />
       <Toast message={toast.message} visible={toast.visible} />
